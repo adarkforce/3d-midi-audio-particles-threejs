@@ -2,12 +2,17 @@
 #pragma glslify: snoise2 = require(glsl-noise/simplex/2d);
 
 varying vec2 vUv;
+varying vec3 vColor;
 
 uniform float time;
 uniform float amplitude;
 uniform float frequency;
 uniform float maxDistance;
 
+uniform float timeX;
+uniform float timeY;
+uniform float timeZ;
+uniform sampler2D uNoiseTexture; 
 
 vec3 curl(vec3 pos) {
 	float x = pos.x;
@@ -17,9 +22,9 @@ vec3 curl(vec3 pos) {
     float	eps	= 1., eps2 = 2. * eps;
     float	n1,	n2,	a,	b;
 
-    x += time * .05;
-    y += time * .05;
-    z += time * .05;
+    x += time * .5 + timeX;
+    y += time * .5 + timeY;
+    z += time * .5 + timeZ;
 
     vec3	curl = vec3(0.);
 
@@ -54,20 +59,45 @@ vec3 curl(vec3 pos) {
     curl.z	=	a	-	b;
 
     return	curl;
-}
+} 
+
+#include <common>
+#include <color_pars_vertex>
+#include <fog_pars_vertex>
+#include <morphtarget_pars_vertex>
+#include <logdepthbuf_pars_vertex>
+#include <clipping_planes_pars_vertex>
 
 void main()	{
-	
-	vec3 newpos = position;
+
+    #include <color_vertex>
+	#include <begin_vertex>
+	#include <morphtarget_vertex>
+	#include <project_vertex>
  
-	vec3 target = position + curl(frequency * newpos) * amplitude;
+	vec3 newpos = position;
 
-	float d = length( newpos - target ) / maxDistance;
+    vec4 noiseTextel = texture2D( uNoiseTexture, vec2(mod(uv.x + time * 0.05, 1.), mod(uv.y + time * 0.05, 1.)) - 0.5);
+  
+    float amp = amplitude *  noiseTextel.r * 10.;
+    float freq = frequency * noiseTextel.r * 5.;
 
-	newpos = mix( position, target, pow( d, 5. ) );
+   // vColor = vec3(noiseTextel.r - .5);
+ 
+	vec3 target = newpos + curl(freq * newpos) * amp;
 
-	vec4 mvPosition = modelViewMatrix * vec4(target, 1.0);
+	float d = length( position - target ) / maxDistance;
+    
+	newpos = mix( position, target, d );
+
+	mvPosition = modelViewMatrix * vec4(target, 1.0);
 	gl_Position = projectionMatrix * mvPosition;
-	gl_PointSize = 2. * (1. / - mvPosition.z);
+	gl_PointSize = 20. * (1. / - mvPosition.z);
+
+    #include <logdepthbuf_vertex>
+	#include <clipping_planes_vertex>
+	#include <worldpos_vertex>
+	#include <fog_vertex>
+
 	
 }
