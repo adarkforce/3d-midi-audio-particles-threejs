@@ -10,8 +10,20 @@ export class AudioManager {
     this.analyser.fftSize = 1024;
     this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
     this.timeDomainData = new Uint8Array(this.analyser.fftSize);
+    document.onclick = async () => await this.resume();
+    document.onscroll = async () => await this.resume();
   }
+
+  async resume() {
+    if (this.context.state === "closed" || this.context.state === "suspended") {
+      await this.context.resume();
+    }
+  }
+
   #registerStream(stream) {
+    if (this.input) {
+      this.input.disconnect(this.analyser);
+    }
     this.input = this.context.createMediaStreamSource(stream);
 
     this.input.connect(this.analyser);
@@ -21,13 +33,9 @@ export class AudioManager {
       (d) => d.kind === "audioinput"
     );
   }
-  getAudioInfo() {
+  updateAudioInfo() {
     this.analyser.getByteFrequencyData(this.freqData);
     this.analyser.getByteTimeDomainData(this.timeDomainData);
-    return {
-      frequencyData: this.freqData,
-      timeDomainData: this.timeDomainData,
-    };
   }
 
   async getOutputDevices() {

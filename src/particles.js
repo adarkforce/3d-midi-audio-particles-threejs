@@ -13,7 +13,6 @@ export class Particles extends THREE.Object3D {
       extensions: {
         derivatives: "#extensons GL_OES_standard_derivatives : enable",
       },
-      side: THREE.DoubleSide,
       transparent: true,
       uniforms: {
         time: { value: 0 },
@@ -26,9 +25,9 @@ export class Particles extends THREE.Object3D {
         uNoiseTexture: { value: null },
         diffuse: { value: new THREE.Color(0xffffff) },
         opacity: { value: 0.8 },
+        interpolation: { value: 0.1 },
       },
       blending: THREE.AdditiveBlending,
-
       vertexShader: vertex,
       fragmentShader: fragment,
     });
@@ -48,6 +47,10 @@ export class Particles extends THREE.Object3D {
       this.material.uniforms.uNoiseTexture.value = texture;
       texture.needsUpdate = true;
     });
+  }
+
+  setInterpolation(interpolation) {
+    this.material.uniforms.interpolation.value = interpolation;
   }
 
   setTimeElapsed(time) {

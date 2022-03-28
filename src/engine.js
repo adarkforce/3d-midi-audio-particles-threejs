@@ -1,10 +1,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { PLYLoader } from "three/examples/jsm/loaders/PLYLoader.js";
 import { Particles } from "./particles.js";
-import { EffectComposer, RenderPass } from "postprocessing";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import * as dat from "dat.gui";
-import { AudioLaunchKeyParticlesController } from "./audio-midi-particle-controller.js";
+import { AudioMidiParticlesController } from "./audio-midi-particle-controller.js";
+import { GammaCorrectionShader } from "three/examples/jsm/shaders/GammaCorrectionShader.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
+import { GUIAudio, GUIControls, GUIMidi } from "./gui.js";
 
 export class Engine {
   constructor() {
@@ -12,14 +16,6 @@ export class Engine {
       width: window.innerWidth,
       height: window.innerHeight,
     };
-
-    this.loadingManager = new THREE.LoadingManager(
-      () => {},
-      () => {},
-      (err) => {
-        console.error(err);
-      }
-    );
 
     this.canvas = document.querySelector("canvas.webgl");
 
@@ -34,9 +30,9 @@ export class Engine {
     this.#setupComposer();
     this.#createParticles();
 
-    AudioLaunchKeyParticlesController.create(this.particles).then(
-      (audioMidiParticlesBinder) => {
-        this.audioMidiParticlesBinder = audioMidiParticlesBinder;
+    AudioMidiParticlesController.create(this.particles).then(
+      (audioMidiParticlesController) => {
+        this.audioMidiParticlesController = audioMidiParticlesController;
         this.#setupGUI();
       }
     );
@@ -46,106 +42,32 @@ export class Engine {
   }
 
   #createParticles() {
-    //const objLoader = new PLYLoader(this.loadingManager);
-
-    //objLoader.load("cesar.ply", (object) => {
-    //  this.particles = new Particles(object);
-    //  this.scene.add(this.particles);
-    //  this.particles.geometry.computeBoundingSphere();
-    //  const boundingSphere = this.particles.geometry.boundingSphere;
-    //  this.camera.position.copy(boundingSphere.center);
-    //  this.camera.lookAt(boundingSphere.center);
-    //  this.camera.position.z += 10;
-    //  this.camera.position.x += 20;
-    //  this.camera.position.y += 10;
-    //});
-    const tetraGeom = new THREE.TetrahedronBufferGeometry(15, 64);
+    const tetraGeom = new THREE.TetrahedronBufferGeometry(15, 128);
     this.particles = new Particles(tetraGeom);
     this.scene.add(this.particles);
     this.particles.geometry.computeBoundingSphere();
     const boundingSphere = this.particles.geometry.boundingSphere;
     this.camera.position.copy(boundingSphere.center);
     this.camera.lookAt(boundingSphere.center);
-    this.camera.position.z += 10;
-    this.camera.position.x += 20;
-    this.camera.position.y += 10;
+    this.camera.translateZ(30);
   }
 
   async #setupGUI() {
     this.gui = new dat.GUI();
     this.gui.open();
-    this.guiState = {
-      midiSelected: "",
-      audioSelected: "",
-    };
-    const midiInputs = this.audioMidiParticlesBinder.midiManager.getInputs();
-    const audioDevices =
-      await this.audioMidiParticlesBinder.audioManager.getInputDevices();
+    this.guiAudio = new GUIAudio(
+      this.gui,
+      this.audioMidiParticlesController.audioInterfaceController
+    );
+    this.guiMidi = new GUIMidi(this.gui, this.audioMidiParticlesController);
+    this.guiControls = new GUIControls(
+      this.gui,
+      this.audioMidiParticlesController
+    );
 
-    const midiOptions = [];
-    for (let input of midiInputs) {
-      midiOptions.push(input[1].name);
-    }
-    this.guiState.midiSelected = midiOptions[0];
-    this.audioMidiParticlesBinder.midiManager.setMidiInterface(midiOptions[0]);
-
-    const midiFolder = this.gui.addFolder("Midi");
-    midiFolder
-      .add(this.guiState, "midiSelected")
-      .options(midiOptions)
-      .onFinishChange((val) => {
-        this.audioMidiParticlesBinder.midiManager.setMidiInterface(val);
-      });
-
-    this.guiState.audioSelected = audioDevices[0].label;
-
-    const audioFolder = this.gui.addFolder("Audio");
-    audioFolder
-      .add(this.guiState, "audioSelected")
-      .options(audioDevices.map((d) => d.label))
-      .onFinishChange(async (val) => {
-        const selectedDevice = audioDevices.filter((d) => d.label === val)[0];
-        this.audioMidiParticlesBinder.audioManager.listenTo(
-          selectedDevice.deviceId
-        );
-      });
-
-    const controllerFolder = this.gui.addFolder("Controls");
-    controllerFolder
-      .add(this.audioMidiParticlesBinder, "maxAmplitudeValue")
-      .min(0.01)
-      .max(5)
-      .step(0.001);
-
-    controllerFolder
-      .add(this.audioMidiParticlesBinder, "maxFrequencyValue")
-      .min(0.01)
-      .max(5)
-      .step(0.001);
-
-    controllerFolder
-      .add(this.audioMidiParticlesBinder, "maxMaxDistanceValue")
-      .min(0.01)
-      .max(5)
-      .step(0.001);
-
-    controllerFolder
-      .add(this.audioMidiParticlesBinder, "maxSpeedX")
-      .min(0.01)
-      .max(5)
-      .step(0.001);
-
-    controllerFolder
-      .add(this.audioMidiParticlesBinder, "maxSpeedY")
-      .min(0.01)
-      .max(5)
-      .step(0.001);
-
-    controllerFolder
-      .add(this.audioMidiParticlesBinder, "maxSpeedZ")
-      .min(0.01)
-      .max(5)
-      .step(0.001);
+    await this.guiAudio.init();
+    this.guiMidi.init();
+    this.guiControls.init();
   }
 
   #createCamera() {
@@ -167,7 +89,10 @@ export class Engine {
 
   #setupComposer() {
     this.composer = new EffectComposer(this.renderer);
+    this.composer.setSize(this.sizes.width, this.sizes.height);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.composer.addPass(new ShaderPass(FXAAShader));
+    this.composer.addPass(new ShaderPass(GammaCorrectionShader));
   }
 
   #createRenderer() {
@@ -191,25 +116,39 @@ export class Engine {
 
       // Update renderer
       this.renderer.setSize(this.sizes.width, this.sizes.height);
+      this.composer.setSize(this.sizes.width, this.sizes.height);
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     });
   }
 
+  tick() {
+    //update midi audio and particles
+    if (this.audioMidiParticlesController)
+      this.audioMidiParticlesController.update();
+
+    //this.camera.rotation.x += 0.001;
+    this.particles.rotateY(0.001);
+
+    // Update Orbital Controls
+    this.controls.update();
+
+    // Render
+    this.composer.render();
+  }
+
   run() {
-    const tick = () => {
-      //update midi audio and particles
-      if (this.audioMidiParticlesBinder) this.audioMidiParticlesBinder.update();
-
-      // Update Orbital Controls
-      this.controls.update();
-
-      // Render
-      this.composer.render();
-
-      // Call tick again on the next frame
-      window.requestAnimationFrame(tick);
+    const _tick = () => {
+      this.tick();
+      this.loopHandler = requestAnimationFrame(() => _tick());
     };
 
-    tick();
+    _tick();
+  }
+
+  stop() {
+    if (this.loopHandler) {
+      cancelAnimationFrame(this.loopHandler);
+    }
   }
 }

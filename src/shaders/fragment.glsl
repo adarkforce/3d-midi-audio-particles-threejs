@@ -1,6 +1,3 @@
-varying vec2 vUv;
-varying vec3 vColor;
-
 uniform float time;
 uniform float delta;
 uniform vec3 diffuse;
@@ -14,6 +11,11 @@ uniform float opacity;
 #include <clipping_planes_pars_fragment>
 
 void main()	{
+
+	float d = length(2.0 * gl_PointCoord - 1.0);
+	if (d > 1.0) {
+		discard;
+	}
 
 	#include <clipping_planes_fragment>
 

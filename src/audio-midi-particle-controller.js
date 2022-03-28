@@ -1,33 +1,33 @@
-import { LanuchkeyController } from "./controllers/launchkey.js";
-import { MidiManager } from "./midi.js";
-import { AudioManager } from "./audio.js";
+import { MidiControllerFactory, MidiMapper } from "./midi.js";
+import { AudioManager as AudioInterfaceController } from "./audio.js";
 import * as THREE from "three";
 
-export class AudioLaunchKeyParticlesController {
+export class AudioMidiParticlesController {
   constructor(particles) {
     this.particles = particles;
 
     this.clock = new THREE.Clock();
 
-    this.maxAmplitudeValue = 3;
-    this.maxFrequencyValue = 0.6;
-    this.maxMaxDistanceValue = 1;
+    this.params = {
+      amplitude: 0.5,
+      frequency: 0.1,
+      maxDistance: 6,
+      freq1: 10,
+      freq2: 50,
+      freq3: 150,
+      timeX: 2,
+      timeY: 2,
+      timeZ: 2,
+      interpolation: 0.2,
+    };
 
-    this.amplitude = 0;
-    this.frequency = 0;
-    this.maxDistance = 0;
-
-    this.maxSpeedX = 0.4;
-    this.maxSpeedY = 0.4;
-    this.maxSpeedZ = 0.8;
-
-    this.timeX = 1;
-    this.timeY = 1;
-    this.timeZ = 1;
+    this.frequencyValue1 = 0;
+    this.frequencyValue2 = 0;
+    this.frequencyValue3 = 0;
   }
 
   static async create(particles) {
-    const audioMidiParticlesBinder = new AudioLaunchKeyParticlesController(
+    const audioMidiParticlesBinder = new AudioMidiParticlesController(
       particles
     );
     await audioMidiParticlesBinder.#setupAudioControls();
@@ -35,74 +35,85 @@ export class AudioLaunchKeyParticlesController {
     return audioMidiParticlesBinder;
   }
 
-  #handleFadersChange(event) {
-    const state = event.state;
-
-    let totalAmplitude = 0;
-    const faderValues = Object.values(state.faderValues);
-    faderValues.forEach((val) => {
-      totalAmplitude += val;
-    });
-    this.amplitude = totalAmplitude / (126 * faderValues.length);
-  }
-
-  #_handleKnobChange(event) {
-    const state = event.state;
-
-    let totalFrequency = 0;
-    let totalMaxDistance = 0;
-    const knobValues = Object.entries(state.knobValues);
-    knobValues.forEach(([id, val]) => {
-      if (id <= knobValues.length / 2 - 1) {
-        totalFrequency += val;
-      } else {
-        totalMaxDistance += val;
-      }
-    });
-    this.frequency = totalFrequency / (126 * (knobValues.length / 2));
-    this.maxDistance = totalMaxDistance / (126 * (knobValues.length / 2));
-  }
-
   async #setupAudioControls() {
-    this.audioManager = new AudioManager();
-    this.audioDevices = await this.audioManager.getInputDevices();
-    this.audioManager.listenTo(this.audioDevices[0].deviceId);
+    this.audioInterfaceController = new AudioInterfaceController();
+    this.audioDevices = await this.audioInterfaceController.getInputDevices();
+    this.audioInterfaceController.listenTo(this.audioDevices[0].deviceId);
   }
 
   async #setupMidiControls() {
-    this.midiManager = await MidiManager.ready();
-    this.launchKeyController = new LanuchkeyController(this.midiManager);
-    this.launchKeyController.onFaderChange((event) =>
-      this.#handleFadersChange(event)
-    );
-    this.launchKeyController.onKnobChange((event) =>
-      this.#_handleKnobChange(event)
-    );
+    this.midiController = await MidiControllerFactory.createController();
+    const inputs = [];
+    for (const [id, midiInput] of this.midiController.getInputs()) {
+      inputs.push(midiInput);
+    }
+    const midiInterface = inputs[0];
+    if (!midiInterface) return;
+    this.midiController.setActiveMidiInterface(midiInterface);
+    this.midiMapper = new MidiMapper(this.midiController, this.params);
   }
 
   #processAudio() {
-    const audioInfo = this.audioManager.getAudioInfo();
-    const freqLen = audioInfo.frequencyData.length;
+    this.audioInterfaceController.updateAudioInfo();
 
-    const freqValue1 = audioInfo.frequencyData[4];
-    this.timeY = freqValue1 / 128;
+    const freqValue1 =
+      this.audioInterfaceController.freqData[Math.floor(this.params.freq1)];
+    this.frequencyValue1 = freqValue1 / 256;
 
-    const freqValue2 = audioInfo.frequencyData[10];
-    this.timeX = freqValue2 / 128;
+    const freqValue2 =
+      this.audioInterfaceController.freqData[Math.floor(this.params.freq2)];
+    this.frequencyValue2 = freqValue2 / 256;
 
-    const freqValue3 = audioInfo.frequencyData[20];
-    this.timeZ = (freqValue3 / 128) * this.maxSpeedZ;
+    const freqValue3 =
+      this.audioInterfaceController.freqData[Math.floor(this.params.freq3)];
+    this.frequencyValue3 = freqValue3 / 256;
+  }
+
+  #updateParams() {
+    let amplitude = this.params.amplitude;
+
+    let frequency = this.params.frequency;
+
+    let maxDistance = this.params.maxDistance;
+
+    let timeX = this.params.timeX * this.frequencyValue1;
+
+    let timeY = this.params.timeY * this.frequencyValue2;
+
+    let timeZ = this.params.timeZ * this.frequencyValue3;
+
+    let interpolation = this.params.interpolation;
+
+    return {
+      amplitude,
+      frequency,
+      timeX,
+      timeY,
+      timeZ,
+      maxDistance,
+      interpolation,
+    };
   }
 
   update() {
     const elapsedTime = this.clock.getElapsedTime();
+    const {
+      amplitude,
+      frequency,
+      timeX,
+      timeY,
+      timeZ,
+      maxDistance,
+      interpolation,
+    } = this.#updateParams();
     this.#processAudio();
     this.particles.setTimeElapsed(elapsedTime);
-    this.particles.setAmplitude(this.amplitude * this.maxAmplitudeValue);
-    this.particles.setFrequency(this.frequency * this.maxFrequencyValue);
-    this.particles.setMaxDistance(this.maxDistance * this.maxMaxDistanceValue);
-    this.particles.setTimeMultiplierX(this.timeX * this.maxSpeedX);
-    this.particles.setTimeMultiplierY(this.timeY * this.maxSpeedY);
-    this.particles.setTimeMultiplierZ(this.timeZ * this.maxSpeedZ);
+    this.particles.setAmplitude(amplitude);
+    this.particles.setFrequency(frequency);
+    this.particles.setMaxDistance(maxDistance);
+    this.particles.setTimeMultiplierX(timeX);
+    this.particles.setTimeMultiplierY(timeY);
+    this.particles.setTimeMultiplierZ(timeZ);
+    this.particles.setInterpolation(interpolation);
   }
 }
