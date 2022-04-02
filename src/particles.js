@@ -24,7 +24,7 @@ export class Particles extends THREE.Object3D {
         timeZ: { value: 0.05 },
         uNoiseTexture: { value: null },
         diffuse: { value: new THREE.Color(0xffffff) },
-        opacity: { value: 0.8 },
+        opacity: { value: 0.1 },
         interpolation: { value: 0.1 },
       },
       blending: THREE.AdditiveBlending,

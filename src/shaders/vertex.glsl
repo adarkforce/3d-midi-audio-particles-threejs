@@ -79,18 +79,18 @@ void main()	{
     vec4 noiseTextel2 = texture2D( uNoiseTexture, uv);
 
     float amp = amplitude + noiseTextel.r * .3;
-    amp = mix(amp, amp + timeX * .001, .75);
+    amp = mix(amp, amp * timeX * .001, .75) + timeX;
 
     float freq = frequency + noiseTextel2.r * .1;
 
     float freqPosX = freq * newpos.x;
-    freqPosX = mix(freqPosX, freqPosX + timeX, interpolation);
+    freqPosX = mix(freqPosX, freqPosX * timeX, interpolation);
 
     float freqPosY = freq * newpos.y;
-    freqPosY = mix(freqPosY, freqPosY + timeY, interpolation);
+    freqPosY = mix(freqPosY, freqPosY * timeY, interpolation);
 
     float freqPosZ = freq * newpos.z;
-    freqPosZ = mix(freqPosZ, freqPosZ + timeZ, interpolation);
+    freqPosZ = mix(freqPosZ, freqPosZ * timeZ, interpolation);
  
 	vec3 target = newpos + curl(vec3(freqPosX, freqPosY, freqPosZ )) * amp;
 

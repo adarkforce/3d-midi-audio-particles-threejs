@@ -1,5 +1,4 @@
 uniform float time;
-uniform float delta;
 uniform vec3 diffuse;
 uniform float opacity;
 

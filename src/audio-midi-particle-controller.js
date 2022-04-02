@@ -9,7 +9,7 @@ export class AudioMidiParticlesController {
     this.clock = new THREE.Clock();
 
     this.params = {
-      amplitude: 1.5,
+      amplitude: 3,
       frequency: 0.1,
       maxDistance: 3,
       freq1: 10,
