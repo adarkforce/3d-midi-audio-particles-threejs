@@ -18,16 +18,5 @@ export default merge(commonConfiguration, {
     open: true,
     https: true,
     allowedHosts: "all",
-    onAfterSetupMiddleware: function (app, server, compiler) {
-      const localIp = internalIpV4Sync();
-      const domain1 = `http://${localIp}:${PORT}`;
-      const domain2 = `http://localhost:${PORT}`;
-
-      console.log(
-        `Project running at:\n  - ${infoColor(domain1)}\n  - ${infoColor(
-          domain2
-        )}`
-      );
-    },
   },
 });

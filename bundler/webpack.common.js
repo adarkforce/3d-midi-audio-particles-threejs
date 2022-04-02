@@ -22,6 +22,9 @@ export default {
     }),
     new MiniCSSExtractPlugin(),
   ],
+  resolve: {
+    modules: ["node_modules"],
+  },
   devtool: "source-map",
   module: {
     rules: [
