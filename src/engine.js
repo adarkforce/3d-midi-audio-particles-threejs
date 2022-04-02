@@ -5,13 +5,13 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import * as dat from "dat.gui";
 import { AudioMidiParticlesController } from "./audio-midi-particle-controller.js";
-import { GammaCorrectionShader } from "three/examples/jsm/shaders/GammaCorrectionShader.js";
-import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
-import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
+import { SMAAPass } from "three/examples/jsm/postprocessing/SMAAPass.js";
 import { GUIAudio, GUIControls, GUIMidi } from "./gui.js";
+import Stats from "three/examples/jsm/libs/stats.module.js";
 
 export class Engine {
   constructor() {
+    this._debug = false;
     this.sizes = {
       width: window.innerWidth,
       height: window.innerHeight,
@@ -30,31 +30,28 @@ export class Engine {
     this.#setupComposer();
     this.#createParticles();
 
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enabled = false;
+    this.stats = new Stats();
     AudioMidiParticlesController.create(this.particles).then(
       (audioMidiParticlesController) => {
         this.audioMidiParticlesController = audioMidiParticlesController;
         this.#setupGUI();
       }
     );
-
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enabled = true;
   }
 
   #createParticles() {
-    const tetraGeom = new THREE.TetrahedronBufferGeometry(15, 128);
+    const tetraGeom = new THREE.TetrahedronBufferGeometry(15, 256);
     this.particles = new Particles(tetraGeom);
     this.scene.add(this.particles);
     this.particles.geometry.computeBoundingSphere();
     const boundingSphere = this.particles.geometry.boundingSphere;
-    this.camera.position.copy(boundingSphere.center);
-    this.camera.lookAt(boundingSphere.center);
-    this.camera.translateZ(30);
+    this.camera.position.copy(boundingSphere.center.clone());
   }
 
   async #setupGUI() {
     this.gui = new dat.GUI();
-    this.gui.open();
     this.guiAudio = new GUIAudio(
       this.gui,
       this.audioMidiParticlesController.audioInterfaceController
@@ -68,6 +65,16 @@ export class Engine {
     await this.guiAudio.init();
     this.guiMidi.init();
     this.guiControls.init();
+
+    if (this._debug) document.body.appendChild(this.stats.dom);
+    this.gui.close();
+  }
+
+  set debug(val) {
+    this._debug = val;
+    try {
+      if (!this._debug) document.body.removeChild(this.stats.dom);
+    } catch (err) {}
   }
 
   #createCamera() {
@@ -89,19 +96,23 @@ export class Engine {
 
   #setupComposer() {
     this.composer = new EffectComposer(this.renderer);
-    this.composer.setSize(this.sizes.width, this.sizes.height);
+
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(new ShaderPass(FXAAShader));
-    this.composer.addPass(new ShaderPass(GammaCorrectionShader));
+
+    const smaaPass = new SMAAPass(
+      this.sizes.width * this.renderer.getPixelRatio(),
+      this.sizes.height * this.renderer.getPixelRatio()
+    );
+    this.composer.addPass(smaaPass);
+
+    this.composer.setSize(this.sizes.width, this.sizes.height);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   }
 
   #createRenderer() {
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       powerPreference: "high-performance",
-      antialias: false,
-      stencil: false,
-      depth: false,
     });
     this.renderer.setSize(this.sizes.width, this.sizes.height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -122,24 +133,36 @@ export class Engine {
     });
   }
 
-  tick() {
+  tick(elapsedTime) {
     //update midi audio and particles
-    if (this.audioMidiParticlesController)
+    if (this.audioMidiParticlesController) {
       this.audioMidiParticlesController.update();
+      const center = this.particles.geometry.boundingSphere.center;
+      this.camera.lookAt(center);
+      this.camera.position.x +=
+        0.5 *
+        Math.cos(
+          elapsedTime *
+            Math.log(this.audioMidiParticlesController.params.frequency)
+        );
+      this.camera.position.z +=
+        0.5 *
+        Math.sin(
+          elapsedTime * this.audioMidiParticlesController.params.amplitude
+        );
+    }
 
-    //this.camera.rotation.x += 0.001;
-    this.particles.rotateY(0.001);
-
-    // Update Orbital Controls
     this.controls.update();
 
-    // Render
+    if (this.stats && !this._debug) this.stats.update();
+
     this.composer.render();
   }
 
   run() {
     const _tick = () => {
-      this.tick();
+      const elapsedTime = this.clock.getElapsedTime();
+      this.tick(elapsedTime);
       this.loopHandler = requestAnimationFrame(() => _tick());
     };
 

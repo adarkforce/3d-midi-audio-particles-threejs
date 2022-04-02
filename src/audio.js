@@ -10,8 +10,8 @@ export class AudioManager {
     this.analyser.fftSize = 1024;
     this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
     this.timeDomainData = new Uint8Array(this.analyser.fftSize);
-    document.onclick = async () => await this.resume();
-    document.onscroll = async () => await this.resume();
+    document.addEventListener("click", async () => await this.resume());
+    document.addEventListener("scroll", async () => await this.resume());
   }
 
   async resume() {
