@@ -40,7 +40,7 @@ export class GUIControls {
     this.controllerFolder
       .add(this.audioMidiParticlesController.params, "timeX")
       .min(0.01)
-      .max(5)
+      .max(10)
       .step(0.001)
       .listen()
       .updateDisplay();
@@ -48,7 +48,7 @@ export class GUIControls {
     this.controllerFolder
       .add(this.audioMidiParticlesController.params, "timeY")
       .min(0.01)
-      .max(5)
+      .max(10)
       .step(0.001)
       .listen()
       .updateDisplay();
@@ -56,7 +56,7 @@ export class GUIControls {
     this.controllerFolder
       .add(this.audioMidiParticlesController.params, "timeZ")
       .min(0.01)
-      .max(5)
+      .max(10)
       .step(0.001)
       .listen()
       .updateDisplay();
@@ -69,18 +69,163 @@ export class GUIMidi {
     this.audioMidiParticlesController = audioMidiParticlesController;
     this.midiManager = this.audioMidiParticlesController.midiController;
     this.midiMapper = this.audioMidiParticlesController.midiMapper;
+
+    this.currentMappingsGUIControllers = [];
+    this.savedMappingsGUIControllers = [];
+
+    this.mappingState = {
+      property: "",
+      maxValue: 1,
+      minValue: 0,
+      mappingStarted: false,
+      currentControl: "",
+      mappingName: "",
+    };
+
+    this.midiMapper.onCurrentMidiMessageChange((midiMessage) => {
+      this.mappingState.currentControl = midiMessage.controlId;
+    });
   }
-  init() {
-    if (!this.midiManager || !this.midiMapper) return;
+  #updateCurrentMidiMappings = () => {
+    this.currentMappingsGUIControllers.forEach((controller) =>
+      controller.remove()
+    );
+    this.currentMappingsGUIControllers = [];
+    const _this = this;
+    for (const mapping of this.midiMapper.midiMappings) {
+      const name = `${mapping.midiMessage.controlId} -> ${mapping.property}`;
+      const guiController = this.currentMappingFolder.add(
+        {
+          [name]: () => this.midiMapper.removeMapping(mapping),
+        },
+        name
+      );
+      guiController.onFinishChange(function () {
+        _this.#updateCurrentMidiMappings();
+      });
+      this.currentMappingsGUIControllers.push(guiController);
+    }
+  };
+
+  #updateSavedMappings() {
+    this.savedMappingsGUIControllers.forEach((controller) =>
+      controller.remove()
+    );
+    this.savedMappingsGUIControllers = [];
+    const savedMappings = this.midiMapper.getSavedMappingsList();
+    for (const savedMapping of savedMappings) {
+      const guiController = this.savedMappingFolder
+        .add(
+          {
+            [savedMapping.key]: () => {
+              this.mappingState.mappingName = savedMapping.key;
+              this.midiMapper.loadFromStorage(savedMapping.key);
+            },
+          },
+          savedMapping.key
+        )
+        .onFinishChange(() => {
+          this.#updateCurrentMidiMappings();
+          this.currentMappingFolder.open();
+        });
+      this.savedMappingsGUIControllers.push(guiController);
+    }
+    if (savedMappings.length > 0) this.savedMappingFolder.open();
+  }
+
+  #createNewMappingFolder(parent) {
+    this.newMappingFolder = parent.addFolder("New Mapping");
+    this.newMappingFolder.add(
+      this.mappingState,
+      "property",
+      Object.keys(this.audioMidiParticlesController.params)
+    );
+    this.newMappingFolder.add(this.mappingState, "maxValue").step(0.01);
+    this.newMappingFolder.add(this.mappingState, "minValue").step(0.01);
+    this.newMappingFolder.add(this.mappingState, "currentControl").listen();
+
+    const _this = this;
+
+    this.newMappingFolder
+      .add({ startMapping: () => {} }, "startMapping")
+      .onFinishChange(function () {
+        const startEndMappingButton = this;
+        if (!_this.mappingState.mappingStarted) {
+          const maxValue = _this.mappingState.maxValue;
+          const minValue = _this.mappingState.minValue;
+          _this.midiMapper.startMapping({
+            property: _this.mappingState.property,
+            maxValue: maxValue,
+            minValue: minValue,
+          });
+          startEndMappingButton.name("End Mapping");
+          startEndMappingButton.updateDisplay();
+        } else {
+          _this.midiMapper.endMapping();
+          startEndMappingButton.name("Start Mapping");
+          startEndMappingButton.updateDisplay();
+        }
+        _this.mappingState.mappingStarted = !_this.mappingState.mappingStarted;
+        _this.#updateCurrentMidiMappings();
+      });
+  }
+
+  #createStorageFolder(parent) {
+    this.storageFolder = parent.addFolder("Storage");
+
+    this.storageFolder
+      .add(this.mappingState, "mappingName")
+      .name("Mapping Name")
+      .listen();
+
+    this.storageFolder
+      .add(
+        {
+          load: () =>
+            this.midiMapper.loadFromStorage(this.mappingState.mappingName),
+        },
+        "load"
+      )
+      .name("Load Mapping")
+      .onFinishChange(() => {
+        this.#updateCurrentMidiMappings();
+        this.currentMappingFolder.open();
+      });
+
+    this.storageFolder
+      .add(
+        {
+          save: () =>
+            this.midiMapper.saveToStorage(this.mappingState.mappingName),
+        },
+        "save"
+      )
+      .name("Save Mapping")
+      .onFinishChange(() => this.#updateSavedMappings());
+
+    this.storageFolder
+      .add(
+        {
+          erase: () =>
+            this.midiMapper.eraseFromStorage(this.mappingState.mappingName),
+        },
+        "erase"
+      )
+      .name("Erase Mapping")
+      .onFinishChange(() => this.#updateSavedMappings());
+  }
+
+  #createMidiFolder(parent) {
     const midiInputs = this.midiManager.getInputs();
     const midiOptions = [];
     for (let input of midiInputs) {
       midiOptions.push(input[1].name);
     }
-    this.midiFolder = this.gui.addFolder("Midi");
+    this.midiFolder = parent.addFolder("MIDI");
     this.midiFolder
       .add(this.midiManager.midiInterface, "name")
       .options(midiOptions)
+      .name("MIDI Input")
       .onFinishChange((val) => {
         for (const [id, midiInput] of this.midiController.getInputs()) {
           if (midiInput.name === val) {
@@ -88,112 +233,43 @@ export class GUIMidi {
           }
         }
       });
-    const paramsKeys = Object.keys(this.audioMidiParticlesController.params);
-    this.mappingState = {
-      property: paramsKeys[0],
-      maxValue: 1,
-      minValue: 0,
-      started: false,
-      currentControl: "",
-      mappingName: "",
-    };
-    this.mappingFolder = this.midiFolder.addFolder("Mapping");
+  }
+
+  #createMappingFolder(parent) {
+    this.mappingFolder = parent.addFolder("MIDI Mapping");
     this.mappingFolder.open();
+  }
 
-    this.mappingFolder
-      .add(this.mappingState, "mappingName")
-      .name("Mapping Name")
-      .listen();
-    this.mappingFolder
-      .add(
-        {
-          load: () => {
-            this.midiMapper.load(this.mappingState.mappingName);
-          },
-        },
-        "load"
-      )
-      .name("Load Mapping")
-      .onFinishChange(() => {
-        updateCurrentMidiMappings();
-      });
-    this.mappingFolder
-      .add(
-        {
-          save: () => {
-            this.midiMapper.save(this.mappingState.mappingName);
-          },
-        },
-        "save"
-      )
-      .name("Save Mapping");
+  #createSavedMappingsFolder(parent) {
+    this.savedMappingFolder = parent.addFolder("Saved Mappings");
+    this.#updateSavedMappings();
+  }
 
-    this.newMappingFolder = this.mappingFolder.addFolder("New Mapping");
-    this.newMappingFolder.open();
-    this.newMappingFolder.add(this.mappingState, "property", paramsKeys);
-    this.newMappingFolder.add(this.mappingState, "maxValue").step(0.01);
-    this.newMappingFolder.add(this.mappingState, "minValue").step(0.01);
+  #createCurrentMappingsFolder(parent) {
+    this.currentMappingFolder = parent.addFolder("Loaded Mapping Values");
+    this.#updateCurrentMidiMappings();
+  }
 
-    this.newMappingFolder.add(this.mappingState, "currentControl").listen();
+  init() {
+    if (!this.midiManager || !this.midiMapper) return;
 
-    this.audioMidiParticlesController.midiMapper.onCurrentMidiMessageChange(
-      (midiMessage) => {
-        this.mappingState.currentControl = midiMessage.controlId;
-      }
-    );
-    const _this = this;
+    const firstPropertyKey = Object.keys(
+      this.audioMidiParticlesController.params
+    )[0];
 
-    const updateCurrentMidiMappings = () => {
-      if (!!this.currentMappingFolder) {
-        this.mappingFolder.removeFolder(this.currentMappingFolder);
-      }
-      this.currentMappingFolder =
-        this.mappingFolder.addFolder("Current Mapping");
-      this.currentMappingFolder.open();
-      const midiMappings =
-        this.audioMidiParticlesController.midiMapper.midiMappings;
-      for (const mapping of midiMappings) {
-        const name = `${mapping.midiMessage.controlId} -> ${mapping.property}`;
-        this.currentMappingFolder
-          .add(
-            {
-              [name]: () => {
-                this.audioMidiParticlesController.midiMapper.removeMapping(
-                  mapping
-                );
-              },
-            },
-            name
-          )
-          .onFinishChange(function () {
-            updateCurrentMidiMappings();
-          });
-      }
-    };
+    this.mappingState.property = firstPropertyKey;
 
-    this.newMappingFolder
-      .add({ startMapping: () => {} }, "startMapping")
-      .onFinishChange(function () {
-        if (!_this.mappingState.started) {
-          const maxValue = _this.mappingState.maxValue;
-          const minValue = _this.mappingState.minValue;
-          _this.audioMidiParticlesController.midiMapper.startMapping({
-            property: _this.mappingState.property,
-            maxValue: maxValue,
-            minValue: minValue,
-          });
-          this.name("End Mapping");
-          this.updateDisplay();
-        } else {
-          _this.audioMidiParticlesController.midiMapper.endMapping();
-          this.name("Start Mapping");
-          this.updateDisplay();
-        }
-        _this.mappingState.started = !_this.mappingState.started;
-        updateCurrentMidiMappings();
-      });
+    this.#createMidiFolder(this.gui);
 
-    updateCurrentMidiMappings();
+    this.#createMappingFolder(this.midiFolder);
+
+    this.#createStorageFolder(this.mappingFolder);
+
+    this.#createSavedMappingsFolder(this.mappingFolder);
+
+    this.#createNewMappingFolder(this.mappingFolder);
+
+    this.#createCurrentMappingsFolder(this.mappingFolder);
   }
 }
 
@@ -212,6 +288,7 @@ export class GUIAudio {
     this.audioFolder
       .add(this.state, "audioSelected")
       .options(audioDevices.map((d) => d.label))
+      .name("Audio Input")
       .onFinishChange(async (val) => {
         const selectedDevice = audioDevices.filter((d) => d.label === val)[0];
         this.audioInterfaceController.listenTo(selectedDevice.deviceId);

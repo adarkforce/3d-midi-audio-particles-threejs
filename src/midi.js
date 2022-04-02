@@ -54,14 +54,32 @@ export class MidiMapper {
     }
   }
 
-  save(name) {
+  getSavedMappingsList() {
+    let keyIndex = 0;
+    const savedMappings = [];
+    while (localStorage.key(keyIndex) !== null) {
+      const key = localStorage.key(keyIndex);
+      const mapping = localStorage.getItem(key);
+      if (mapping !== null) {
+        savedMappings.push({ key, mapping: JSON.parse(mapping) });
+      }
+      keyIndex++;
+    }
+    return savedMappings;
+  }
+
+  saveToStorage(name) {
     localStorage.setItem(name, JSON.stringify(this.midiMappings));
   }
 
-  load(name) {
+  loadFromStorage(name) {
     const midiMappings = JSON.parse(localStorage.getItem(name));
     if (midiMappings) this.midiMappings = midiMappings;
     else console.warn("cannot load midi mapping...");
+  }
+
+  eraseFromStorage(name) {
+    localStorage.removeItem(name);
   }
 
   removeMapping(mapping) {
