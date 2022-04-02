@@ -17,6 +17,7 @@
     "file-loader": "^6.2.0",
     "glsl-noise": "^0.0.0",
     "glslify-loader": "^2.0.0",
+    "gsap": "^3.10.2",
     "html-loader": "^2.1.1",
     "html-webpack-plugin": "^5.2.0",
     "internal-ip": "^7.0.0",
