@@ -59,20 +59,11 @@ vec3 curl(vec3 pos) {
     return	curl;
 } 
 
-#include <common>
-#include <color_pars_vertex>
-#include <fog_pars_vertex>
-#include <morphtarget_pars_vertex>
-#include <logdepthbuf_pars_vertex>
-#include <clipping_planes_pars_vertex>
-
 void main()	{
 
-    #include <color_vertex>
-	#include <begin_vertex>
-	#include <morphtarget_vertex>
-	#include <project_vertex>
- 
+    
+    vec4 mvPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
+
 	vec3 newpos = position;
 
     vec4 noiseTextel = texture2D( uNoiseTexture, vec2(mod(uv.x + time * 0.05, 1.), mod(uv.y + time * 0.05, 1.)) - 0.5);
@@ -106,10 +97,6 @@ void main()	{
 	
     gl_PointSize = 30. * (1. / - mvPosition.z);
 
-    #include <logdepthbuf_vertex>
-	#include <clipping_planes_vertex>
-	#include <worldpos_vertex>
-	#include <fog_vertex>
 
 	
 }

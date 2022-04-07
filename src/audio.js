@@ -1,6 +1,3 @@
-window.AudioContext = window.AudioContext || window.webkitAudioContext;
-navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia;
-
 export class AudioManager {
   constructor() {
     navigator.mediaDevices.getUserMedia({ audio: true });
@@ -20,13 +17,24 @@ export class AudioManager {
     }
   }
 
-  #registerStream(stream) {
+  async #registerElement(element) {
+    if (this.input) {
+      this.input.disconnect(this.analyser);
+    }
+    this.input = this.context.createMediaElementSource(element);
+
+    this.input.connect(this.analyser);
+    await this.resume();
+  }
+
+  async #registerStream(stream) {
     if (this.input) {
       this.input.disconnect(this.analyser);
     }
     this.input = this.context.createMediaStreamSource(stream);
-
+    console.log(this.input);
     this.input.connect(this.analyser);
+    await this.resume();
   }
   async getInputDevices() {
     return (await navigator.mediaDevices.enumerateDevices()).filter(
@@ -44,18 +52,11 @@ export class AudioManager {
     );
   }
 
-  listenTo(deviceId) {
-    if (!deviceId) {
-      throw new Error("device id is required!");
-    }
-    navigator.getUserMedia(
-      {
-        audio: { deviceId: { exact: deviceId } },
-      },
-      this.#registerStream.bind(this),
-      (err) => {
-        throw new Error(err);
-      }
-    );
+  async listenTo(deviceId) {
+    console.log(navigator.mediaDevices.getUserMedia);
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { deviceId: { exact: deviceId } },
+    });
+    this.#registerStream(stream);
   }
 }

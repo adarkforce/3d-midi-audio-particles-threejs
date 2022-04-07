@@ -81,10 +81,10 @@ export class GUIMidi {
       currentControl: "",
       mappingName: "",
     };
-
-    this.midiMapper.onCurrentMidiMessageChange((midiMessage) => {
-      this.mappingState.currentControl = midiMessage.controlId;
-    });
+    if (this.midiMapper)
+      this.midiMapper.onCurrentMidiMessageChange((midiMessage) => {
+        this.mappingState.currentControl = midiMessage.controlId;
+      });
   }
   #updateCurrentMidiMappings = () => {
     this.currentMappingsGUIControllers.forEach((controller) =>
@@ -140,14 +140,24 @@ export class GUIMidi {
       "property",
       Object.keys(this.audioMidiParticlesController.params)
     );
-    this.newMappingFolder.add(this.mappingState, "maxValue").step(0.01);
-    this.newMappingFolder.add(this.mappingState, "minValue").step(0.01);
-    this.newMappingFolder.add(this.mappingState, "currentControl").listen();
+    this.newMappingFolder
+      .add(this.mappingState, "maxValue")
+      .name("Max Value")
+      .step(0.01);
+    this.newMappingFolder
+      .add(this.mappingState, "minValue")
+      .name("Min Value")
+      .step(0.01);
+    this.newMappingFolder
+      .add(this.mappingState, "currentControl")
+      .name("Current Control")
+      .listen();
 
     const _this = this;
 
     this.newMappingFolder
       .add({ startMapping: () => {} }, "startMapping")
+      .name("Start Mapping")
       .onFinishChange(function () {
         const startEndMappingButton = this;
         if (!_this.mappingState.mappingStarted) {
@@ -246,12 +256,17 @@ export class GUIMidi {
   }
 
   #createCurrentMappingsFolder(parent) {
-    this.currentMappingFolder = parent.addFolder("Loaded Mapping Values");
+    this.currentMappingFolder = parent.addFolder("Loaded Mappings");
     this.#updateCurrentMidiMappings();
   }
 
   init() {
-    if (!this.midiManager || !this.midiMapper) return;
+    if (
+      !this.midiManager ||
+      !this.midiMapper ||
+      this.audioMidiParticlesController.midiAvailable !== true
+    )
+      return;
 
     const firstPropertyKey = Object.keys(
       this.audioMidiParticlesController.params
@@ -283,6 +298,7 @@ export class GUIAudio {
   }
   async init() {
     const audioDevices = await this.audioInterfaceController.getInputDevices();
+    if (audioDevices.length === 0) return;
     this.state.audioSelected = audioDevices[0].label;
     this.audioFolder = this.gui.addFolder("Audio");
     this.audioFolder

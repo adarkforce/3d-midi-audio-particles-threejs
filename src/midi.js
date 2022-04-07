@@ -232,7 +232,7 @@ class MidiController {
 
 class MidiControllerFactoryImpl {
   createController() {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const onMIDIFailure = (msg) => {
         console.log("Failed to get MIDI access - " + msg);
         reject(msg);
@@ -241,11 +241,16 @@ class MidiControllerFactoryImpl {
       const onMidiSuccess = (midiAccess) => {
         resolve(new MidiController(midiAccess));
       };
-
-      navigator
-        .requestMIDIAccess()
-        .then((midiAccess) => onMidiSuccess(midiAccess))
-        .catch((msg) => onMIDIFailure(msg));
+      try {
+        if (navigator.requestMIDIAccess) {
+          const midiAccess = await navigator.requestMIDIAccess();
+          onMidiSuccess(midiAccess);
+        } else {
+          onMIDIFailure();
+        }
+      } catch (err) {
+        onMIDIFailure(err);
+      }
     });
   }
 }

@@ -36,21 +36,31 @@ export class AudioMidiParticlesController {
   }
 
   async #setupAudioControls() {
-    this.audioInterfaceController = new AudioInterfaceController();
-    this.audioDevices = await this.audioInterfaceController.getInputDevices();
-    this.audioInterfaceController.listenTo(this.audioDevices[0].deviceId);
+    try {
+      this.audioInterfaceController = new AudioInterfaceController();
+      this.audioDevices = await this.audioInterfaceController.getInputDevices();
+      this.audioInterfaceController.listenTo(this.audioDevices[0].deviceId);
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   async #setupMidiControls() {
-    this.midiController = await MidiControllerFactory.createController();
-    const inputs = [];
-    for (const [id, midiInput] of this.midiController.getInputs()) {
-      inputs.push(midiInput);
+    try {
+      this.midiController = await MidiControllerFactory.createController();
+      const inputs = [];
+      for (const [id, midiInput] of this.midiController.getInputs()) {
+        inputs.push(midiInput);
+      }
+      const midiInterface = inputs[0];
+      if (!midiInterface) return;
+      this.midiController.setActiveMidiInterface(midiInterface);
+      this.midiMapper = new MidiMapper(this.midiController, this.params);
+      this.midiAvailable = true;
+    } catch (err) {
+      console.log(err);
+      this.midiAvailable = false;
     }
-    const midiInterface = inputs[0];
-    if (!midiInterface) return;
-    this.midiController.setActiveMidiInterface(midiInterface);
-    this.midiMapper = new MidiMapper(this.midiController, this.params);
   }
 
   #processAudio() {
