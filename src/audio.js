@@ -3,8 +3,8 @@ export class AudioManager {
     navigator.mediaDevices.getUserMedia({ audio: true });
     this.context = new window.AudioContext();
     this.analyser = this.context.createAnalyser();
-    this.analyser.smoothingTimeConstant = 0.9;
-    this.analyser.fftSize = 1024;
+    this.analyser.smoothingTimeConstant = 0.7;
+    this.analyser.fftSize = 2048;
     this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
     this.timeDomainData = new Uint8Array(this.analyser.fftSize);
     document.addEventListener("click", async () => await this.resume());

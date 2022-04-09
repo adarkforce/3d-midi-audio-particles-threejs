@@ -10,20 +10,16 @@ export class AudioMidiParticlesController {
 
     this.params = {
       amplitude: 3,
-      frequency: 0.1,
+      frequency: 0.01,
       maxDistance: 3,
-      freq1: 10,
-      freq2: 50,
-      freq3: 150,
+      freq1: 60,
+      freq2: 500,
+      freq3: 6000,
       timeX: 2,
-      timeY: 2,
-      timeZ: 2,
-      interpolation: 0.2,
+      timeY: 20,
+      timeZ: 10,
+      interpolation: 0.06,
     };
-
-    this.frequencyValue1 = 0;
-    this.frequencyValue2 = 0;
-    this.frequencyValue3 = 0;
   }
 
   static async create(particles) {
@@ -63,20 +59,37 @@ export class AudioMidiParticlesController {
     }
   }
 
+  #hertzToIndex(hz) {
+    return Math.floor(
+      (hz * this.audioInterfaceController.analyser.frequencyBinCount) /
+        (this.audioInterfaceController.context.sampleRate / 2)
+    );
+  }
+
   #processAudio() {
     this.audioInterfaceController.updateAudioInfo();
 
-    const freqValue1 =
-      this.audioInterfaceController.freqData[Math.floor(this.params.freq1)];
-    this.frequencyValue1 = freqValue1 / 256;
+    const freq1Index = this.#hertzToIndex(this.params.freq1);
+    const freq2Index = this.#hertzToIndex(this.params.freq2);
+    const freq3Index = this.#hertzToIndex(this.params.freq3);
+
+    const freqValue1 = this.audioInterfaceController.freqData[freq1Index];
+    this.frequencyValue1 = freqValue1 / 255;
 
     const freqValue2 =
-      this.audioInterfaceController.freqData[Math.floor(this.params.freq2)];
-    this.frequencyValue2 = freqValue2 / 256;
+      this.audioInterfaceController.freqData[Math.floor(freq2Index)];
+    this.frequencyValue2 = freqValue2 / 255;
 
     const freqValue3 =
-      this.audioInterfaceController.freqData[Math.floor(this.params.freq3)];
-    this.frequencyValue3 = freqValue3 / 256;
+      this.audioInterfaceController.freqData[Math.floor(freq3Index)];
+    this.frequencyValue3 = freqValue3 / 255;
+
+    this.timeDomainValue =
+      (128 -
+        this.audioInterfaceController.timeDomainData[
+          Math.floor(this.audioInterfaceController.analyser.fftSize / 2)
+        ]) /
+      127;
   }
 
   #updateParams() {
@@ -84,7 +97,7 @@ export class AudioMidiParticlesController {
 
     let frequency = this.params.frequency;
 
-    let maxDistance = this.params.maxDistance;
+    let maxDistance = this.params.maxDistance - this.timeDomainValue;
 
     let timeX = this.params.timeX * this.frequencyValue1;
 

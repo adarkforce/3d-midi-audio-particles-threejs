@@ -140,7 +140,9 @@ export class Engine {
       this.audioMidiParticlesController.update();
       const center = this.particles.geometry.boundingSphere.center;
       this.camera.lookAt(center);
-      this.particles.rotateY(0.005);
+      this.particles.rotateY(
+        (this.audioMidiParticlesController.timeDomainValue - 128) / 5000
+      );
     }
 
     this.controls.update();

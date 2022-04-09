@@ -40,7 +40,7 @@ export class GUIControls {
     this.controllerFolder
       .add(this.audioMidiParticlesController.params, "timeX")
       .min(0.01)
-      .max(10)
+      .max(20)
       .step(0.001)
       .listen()
       .updateDisplay();
@@ -48,7 +48,7 @@ export class GUIControls {
     this.controllerFolder
       .add(this.audioMidiParticlesController.params, "timeY")
       .min(0.01)
-      .max(10)
+      .max(20)
       .step(0.001)
       .listen()
       .updateDisplay();
@@ -56,7 +56,7 @@ export class GUIControls {
     this.controllerFolder
       .add(this.audioMidiParticlesController.params, "timeZ")
       .min(0.01)
-      .max(10)
+      .max(20)
       .step(0.001)
       .listen()
       .updateDisplay();
