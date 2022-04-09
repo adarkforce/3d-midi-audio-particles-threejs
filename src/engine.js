@@ -8,8 +8,6 @@ import { AudioMidiParticlesController } from "./audio-midi-particle-controller.j
 import { SMAAPass } from "three/examples/jsm/postprocessing/SMAAPass.js";
 import { GUIAudio, GUIControls, GUIMidi } from "./gui.js";
 import Stats from "three/examples/jsm/libs/stats.module.js";
-import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
-import { GammaCorrectionShader } from "three/examples/jsm/shaders/GammaCorrectionShader.js";
 export class Engine {
   constructor() {
     this._debug = false;
@@ -142,17 +140,7 @@ export class Engine {
       this.audioMidiParticlesController.update();
       const center = this.particles.geometry.boundingSphere.center;
       this.camera.lookAt(center);
-      //this.camera.position.x +=
-      //  0.5 *
-      //  Math.cos(
-      //    elapsedTime *
-      //      Math.log(this.audioMidiParticlesController.params.frequency)
-      //  );
-      //this.camera.position.z +=
-      //  0.5 *
-      //  Math.sin(
-      //    elapsedTime * this.audioMidiParticlesController.params.amplitude
-      //  );
+      this.particles.rotateY(0.005);
     }
 
     this.controls.update();

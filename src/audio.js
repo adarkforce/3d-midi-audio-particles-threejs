@@ -17,22 +17,11 @@ export class AudioManager {
     }
   }
 
-  async #registerElement(element) {
-    if (this.input) {
-      this.input.disconnect(this.analyser);
-    }
-    this.input = this.context.createMediaElementSource(element);
-
-    this.input.connect(this.analyser);
-    await this.resume();
-  }
-
   async #registerStream(stream) {
     if (this.input) {
       this.input.disconnect(this.analyser);
     }
     this.input = this.context.createMediaStreamSource(stream);
-    console.log(this.input);
     this.input.connect(this.analyser);
     await this.resume();
   }
@@ -53,10 +42,9 @@ export class AudioManager {
   }
 
   async listenTo(deviceId) {
-    console.log(navigator.mediaDevices.getUserMedia);
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { deviceId: { exact: deviceId } },
     });
-    this.#registerStream(stream);
+    await this.#registerStream(stream);
   }
 }
